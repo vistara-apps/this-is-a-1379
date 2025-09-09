@@ -7,11 +7,11 @@ services:
     container_name: deploymate-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: deploymate
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-deploymate}
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongodb_data:/data/db
       - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
@@ -24,7 +24,7 @@ services:
     container_name: deploymate-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -38,14 +38,14 @@ services:
     container_name: deploymate-backend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
-      PORT: 5000
-      MONGODB_URI: mongodb://admin:password@mongodb:27017/deploymate?authSource=admin
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: development-secret-key-change-in-production
-      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${BACKEND_PORT:-5000}
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password}@mongodb:${MONGO_PORT:-27017}/${MONGO_DATABASE:-deploymate}?authSource=admin
+      REDIS_URL: redis://redis:${REDIS_PORT:-6379}
+      JWT_SECRET: ${JWT_SECRET:-development-secret-key-change-in-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:${BACKEND_PORT:-5000}"
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
@@ -64,9 +64,9 @@ services:
     container_name: deploymate-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5000/api
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
     volumes:
       - ./src:/app/src
       - ./public:/app/public
