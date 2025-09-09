@@ -1,32 +1,44 @@
-# Multi-stage build: Build stage creates dist, Production stage serves it
-FROM node:22-alpine AS builder
-
-# Install Python and build tools for native dependencies
-RUN apk add --no-cache python3 make g++
+# Build stage
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-  
-RUN npm install --prefer-offline --no-audit
+# Copy package files
+COPY backend/package*.json ./
+RUN npm ci --only=production
 
-# Copy source code after dependencies are installed
-COPY . .
+# Production stage
+FROM node:18-alpine AS production
 
-# Build the application with memory optimization
-RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+# Create app directory
+WORKDIR /usr/src/app
 
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
 
-FROM node:22-alpine AS production
+# Copy package files
+COPY backend/package*.json ./
 
-# Install serve globally for production
-RUN npm install -g serve
+# Install production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-WORKDIR /app
+# Copy source code
+COPY backend/ ./
 
-# Copy ONLY the built dist directory from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+# Change ownership
+RUN chown -R nodejs:nodejs /usr/src/app
+USER nodejs
 
-EXPOSE 3000
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Expose port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5000/api/health', (res) => { \
+    process.exit(res.statusCode === 200 ? 0 : 1) \
+  }).on('error', () => process.exit(1))"
+
+# Start the application
+CMD ["npm", "start"]
+
